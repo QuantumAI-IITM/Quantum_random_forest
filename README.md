@@ -14,3 +14,7 @@ Ive also compared it with some models like -
 2) RBF Kernel SVM with nystrom approximation - 0.62
 3) Quantum Decision tree - 0.64 
 I am also attaching the detailed classification reports of each of the models in the folder results 
+
+
+Project Updates - 
+24th March - Project updates as of 24th march is also uploaded on the repository 
