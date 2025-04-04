@@ -14,7 +14,7 @@ import os
 import more_itertools as mit
 from sklearn.gaussian_process.kernels import RBF
 from nystrom import Nystrom
-from data_construction import check_dataset_relabelled, get_stilted_dataset, save_dataset_relabelled, relabelled_filename, save_kernel_for_dataset_relabelled, all_datasets
+from data_construction import check_dataset_relabelled, get_stilted_dataset, save_dataset_relabelled, relabelled_filename, save_kernel_for_dataset_relabelled
 from sklearn.model_selection import cross_val_score
 
 
