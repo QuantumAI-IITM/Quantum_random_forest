@@ -12,6 +12,38 @@ from pathlib import Path
 from pickle_functions import pickle_file, unpickle_file
 import tensorflow as tf
 
+def scikit_clas_datasets(train_prop=0.75, ret_embed=False, dataset='iris', encode_half_rot=True, **kwargs):
+    """ This function obtains the iris data set and normalises values for embedding. """
+    if dataset == 'iris':
+        data = datasets.load_iris()
+    elif dataset == 'breast_cancer':
+        data = datasets.load_breast_cancer()
+    elif dataset == 'digits':
+        data = datasets.load_digits()
+    elif dataset == 'wine':
+        data = datasets.load_wine()
+    else:
+        data = None; print("Error in loading."); exit()
+    
+    X = data.data
+    if 'X_dim' in kwargs:
+        DATASET_DIM = kwargs['X_dim']
+        X, _ = truncate_x(X, None, n_components=DATASET_DIM)
+        print(f'New datapoint dimension:', len(X[0]))
+    
+    X = q_embed_normalise(X, encode_half_rot=encode_half_rot)
+
+    y = data.target
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_prop)
+    train_data = pd.DataFrame(zip(X_train, y_train), columns=['X', 'y'])
+    test_data = pd.DataFrame(zip(X_test, y_test), columns=['X', 'y'])
+
+    if ret_embed:
+        embed = {i:v for i, v in enumerate(data.target_names)}
+        return train_data, test_data, embed
+    return train_data, test_data
+
+
 def data_preprocessing(X, y, train_prop=0.75, X_dim=None, encode_half_rot=True):
     if X_dim is not None:
         X, _ = truncate_x(X, None, n_components=X_dim)
@@ -24,29 +56,55 @@ def data_preprocessing(X, y, train_prop=0.75, X_dim=None, encode_half_rot=True):
     test_data = pd.DataFrame(zip(X_test, y_test), columns=['X', 'y'])
     return train_data, test_data
 
-def all_datasets(dataset, train_prop=0.75, ret_embed=False, **kwargs):
-    """Provides access to standard scikit-learn datasets: iris, breast_cancer, digits, wine."""
-    if dataset == 'iris':
-        return datasets.load_iris()
-    elif dataset == 'breast_cancer':
-        data = datasets.load_breast_cancer()
-    elif dataset == 'digits':
-        data = datasets.load_digits()
-    elif dataset == 'wine':
-        data = datasets.load_wine()
-    else:
-        raise ValueError("Dataset not recognized. Choose from: iris, breast_cancer, digits, wine.")
+def fashion_mnist_dataset(train_prop=0.75, ret_embed=False, folder='', num_classes=2, tot_num_data=300, **kwargs):
+    """ The data preparation here is idential to the work of Huang et al. 2021. """
+
+    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+    x_train, x_test = x_train / 255.0, x_test / 255.0
+
+    CLASS_SELECTION_ORDER = [0, 3, 5, 1, 2, 4, 6, 7, 8, 9]
     
-    X = data.data
-    y = data.target
+    if num_classes == 2: 
+        x_train, y_train = filter_03(x_train, y_train)
+        x_test, y_test = filter_03(x_test, y_test)
+    elif num_classes == 'all':
+        pass
+    elif num_classes > 2:
+        x_train, y_train = filter_classes(x_train, y_train, CLASS_SELECTION_ORDER[:num_classes])
+        x_test, y_test = filter_classes(x_test, y_test, CLASS_SELECTION_ORDER[:num_classes])
+    else: 
+        print("Cannot obtain {} number of classes from fashion_mnist".format(num_classes)); exit()
+    
+    if 'X_dim' in kwargs:
+        DATASET_DIM = kwargs['X_dim']
+    else:
+        DATASET_DIM = 5
+    
+    x_train, x_test = truncate_x(x_train, x_test, n_components=DATASET_DIM)
+    print(f'New datapoint dimension:', len(x_train[0]))
+
+    # We only look at the training set and split later 
+    x_train = q_embed_normalise(np.array(x_train), encode_half_rot=True)
+
+    NUM = tot_num_data if tot_num_data != 'all' else len(x_train)
+    random_indices = random.sample(range(len(x_train)), NUM)
+    X, y = np.array(x_train[random_indices]), y_train[random_indices]
+    y = np.array(y * 1)
+
+    if train_prop == -1:
+        return pd.DataFrame(zip(X, y), columns=['X', 'y'])
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_prop)
+
     train_data = pd.DataFrame(zip(X_train, y_train), columns=['X', 'y'])
     test_data = pd.DataFrame(zip(X_test, y_test), columns=['X', 'y'])
-    
+
+
     if ret_embed:
-        embed = {i: v for i, v in enumerate(data.target_names)}
+        labels = np.unique(y_train)
+        embed = labels 
         return train_data, test_data, embed
-    
+
     return train_data, test_data
 
 # ----------------------------------------------------------------------------------
@@ -373,7 +431,9 @@ def relabelled_filename(dataset, num_params, embed, kernel=False, qrf_optimal=Fa
 
 def truncate_x(x_train, x_test, n_components=10):
   """Perform PCA on image dataset keeping the top `n_components` components."""
-  n_points_train = tf.gather(tf.shape(x_train), 0)
+  # n_points_train = tf.gather(tf.shape(x_train), 0)
+  n_points_train = tf.shape(x_train)[0]
+
   # Flatten to 1D
   x_train = tf.reshape(x_train, [n_points_train, -1])
   # Normalize.
@@ -384,7 +444,8 @@ def truncate_x(x_train, x_test, n_components=10):
       tf.einsum('ji,jk->ik', x_train_normalized, x_train_normalized))
 
   if x_test is not None:
-    n_points_test = tf.gather(tf.shape(x_test), 0)
+    # n_points_test = tf.gather(tf.shape(x_test), 0)
+    n_points_test = tf.shape(x_test)[0]
     x_test = tf.reshape(x_test, [n_points_test, -1])
     x_test_normalized = x_test - feature_mean
     return tf.einsum('ij,jk->ik', x_train_normalized, e_vectors[:,-n_components:]), \
