@@ -4,7 +4,7 @@ import qiskit
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit import ClassicalRegister
 from qiskit import QuantumCircuit
-from qiskit.primitives import BackendSampler
+from qiskit.primitives import Sampler
 import numpy as np
 from qiskit.providers import QiskitBackendNotFoundError
 from qiskit.compiler import transpile
