@@ -1,0 +1,1 @@
+Here, I have tried to replicate some of the results, as presented in the paper. These mainly include - variation of various parameters like the regularization parameter from the SVMsthen the number of trees, number of Landmark points, number of qubits, depth of trees while training and the partition size of the batches provided in training of trees 
